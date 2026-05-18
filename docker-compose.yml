@@ -1,0 +1,81 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Free Search MCP Server — Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Quick start:
+#   docker compose up -d          # Starts SSE on port 3002 (recommended)
+#   docker compose logs -f        # Watch logs
+#   docker compose down           # Stop everything
+#
+# Other profiles:
+#   docker compose --profile http up -d       # HTTP on port 3003
+#   docker compose --profile full up -d       # SSE with browser fallback on 3004
+#
+# For stdio (most MCP clients), use Docker directly:
+#   docker run --rm -i free-search-mcp:latest --transport stdio
+
+services:
+  # ── Default: SSE transport (recommended, starts with 'docker compose up') ──
+  free-search:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: free-search-mcp:latest
+    container_name: free-search-mcp
+    ports:
+      - "3002:3002"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    restart: unless-stopped
+    command: ["--transport", "sse", "--host", "0.0.0.0", "--port", "3002"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://localhost:3002/sse >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── HTTP transport (opt-in via --profile http) ─────────────────────────────
+  free-search-http:
+    profiles: [http]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: free-search-mcp:latest
+    container_name: free-search-mcp-http
+    ports:
+      - "3003:3003"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    restart: unless-stopped
+    command: ["--transport", "http", "--host", "0.0.0.0", "--port", "3003"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://localhost:3003/mcp >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Full image with browser fallback (opt-in via --profile full) ───────────
+  free-search-full:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: Dockerfile.full
+    image: free-search-mcp:full
+    container_name: free-search-mcp-full
+    ports:
+      - "3004:3004"
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    restart: unless-stopped
+    command: ["--transport", "sse", "--host", "0.0.0.0", "--port", "3004"]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -fsS http://localhost:3004/sse >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

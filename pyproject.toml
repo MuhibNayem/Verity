@@ -1,0 +1,58 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "free-search-mcp"
+version = "0.1.0"
+description = "Unlimited free web search MCP server — Multi-engine with tiered fallbacks (DDGS, Google, Brave, curl_cffi, nodriver). No API keys."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["mcp", "search", "duckduckgo", "google", "brave", "curl-cffi", "nodriver", "free"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+]
+dependencies = [
+    "mcp>=1.6.0",
+    "ddgs>=9.0",
+    "curl-cffi>=0.15.0",
+    "httpx[http2]>=0.27.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "markdownify>=0.13.0",
+]
+
+[project.optional-dependencies]
+browser = [
+    "nodriver>=0.50.0",
+    "playwright>=1.40",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-rerunfailures>=14.0",
+    "ruff>=0.5.0",
+]
+
+[project.scripts]
+free-search = "free_search_mcp.server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/free_search_mcp"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

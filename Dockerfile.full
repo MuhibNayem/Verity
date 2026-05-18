@@ -1,0 +1,75 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Free Search MCP Server — Docker Image (Full)
+# Multi-engine web search with tiered fallbacks. No API keys.
+# INCLUDES Chromium for nodriver CDP fallback + Playwright.
+# Size: ~1.6GB
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Builder stage ────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install build dependencies for lxml and curl-cffi
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libxml2-dev \
+    libxslt1-dev \
+    libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy source and install
+COPY pyproject.toml README.md ./
+COPY src/ ./src/
+
+# Install core + browser dependencies into a virtualenv
+# Skip Playwright's own browser download (we use system Chromium via nodriver)
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir ".[browser]"
+
+
+# ── Runtime stage ────────────────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+LABEL org.opencontainers.image.title="Free Search MCP Server (Full)"
+LABEL org.opencontainers.image.description="Multi-engine web search MCP server with browser fallbacks"
+LABEL org.opencontainers.image.source="https://github.com/yourusername/free-search-mcp"
+
+# Install runtime system deps:
+#   - chromium + chromium-driver: for nodriver CDP fallback
+#   - libxml2 + libxslt1.1: for lxml parsing
+#   - curl: base for curl-cffi
+#   - fonts: prevent font-related web rendering issues
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    chromium-driver \
+    libxml2 \
+    libxslt1.1 \
+    curl \
+    fonts-liberation \
+    fontconfig \
+    && rm -rf /var/lib/apt/lists/*
+
+# Tell nodriver where to find Chromium
+ENV CHROME_BIN=/usr/bin/chromium
+ENV CHROMIUM_FLAGS="--headless --no-sandbox --disable-dev-shm-usage --disable-gpu"
+
+# Copy virtualenv from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser
+USER appuser
+WORKDIR /home/appuser
+
+# Healthcheck for SSE/HTTP transports
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python -c "import free_search_mcp" || exit 1
+
+# Default: stdio transport
+ENTRYPOINT ["free-search"]
+CMD ["--transport", "stdio"]
